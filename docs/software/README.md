@@ -181,43 +181,47 @@ SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS;
 ## Початковий файл программи 
 ```js
 const express = require("express");
-const cors = require("cors");
-const router = require("./routes");
-const AppError = require("./utils/appError");
-const errorHandler = require("./utils/errorHandler");
+const helmet = require("helmet"); 
+const apiRouter = require("./apiRoutes"); 
+const CustomError = require("./utils/customError"); 
+const customErrorHandler = require("./utils/customErrorHandler");
 
 const app = express();
 
 app.use(express.json());
-app.use(cors());
-app.use("/api", router);
+app.use(helmet());
+app.use("/api", apiRouter);
 
 app.all("*", (req, res, next) => {
-    next(new AppError(`The URL ${req.originalUrl} does not exists`, 404));
+    next(new CustomError(`The URL ${req.originalUrl} does not exist`, 404)); 
 });
-app.use(errorHandler);
+
+app.use(customErrorHandler); 
 
 const PORT = 3000;
 app.listen(PORT, () => {
-    console.log(`server running on port ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
 
 module.exports = app;
+
 ```
 
 ## Встановлення доступу до нашої бази данних
 ```js
 const mysql = require("mysql2");
-const conn = mysql.createConnection({
+
+const dbConfig = {
     host: "localhost",
     user: "root",
     password: "19012005",
     database: "lab4",
-});
+};
 
 conn.connect();
 
 module.exports = conn;
+
 ```
 
 ## Контроллер
@@ -226,97 +230,95 @@ const AppError = require("../utils/appError");
 const conn = require("../services/db");
 
 exports.getAllFiles = (req, res, next) => {
-  conn.query("SELECT * FROM file", function (err, data, fields) {
-    if (err) return next(new AppError(err));
-    res.status(200).json({
-      status: "success",
-      length: data?.length,
-      data: data,
+    conn.query("SELECT * FROM file", function (err, data, fields) {
+        if (err) return next(new AppError(err));
+        res.status(200).json({
+            status: "success",
+            length: data?.length,
+            data: data,
+        });
     });
-  });
 };
 
 exports.createFile = (req, res, next) => {
-  if (!req.body) return next(new AppError("No form data found", 404));
-  const values = [
-    req.body.idFILE,
-    req.body.file_name,
-    req.body.file_description,
-    req.body.file_upload,
-    req.body.file_format,
+    if (!req.body) return next(new AppError("No form data found", 404));
+    const values = [
+        req.body.idFILE,
+        req.body.file_name,
+        req.body.file_description,
+        req.body.file_upload,
+        req.body.file_format,
+    ];
 
-  ];
-  conn.query(
-    "INSERT INTO file (idFILE, file_name, file_description, file_upload, file_format) VALUES(?)",
-    [values],
-    function (err, data, fields) {
-      if (err) return next(new AppError(err, 500));
-      res.status(201).json({
-        status: "success",
-        message: "file added!",
-      });
-    }
-  );
+    conn.query(
+        "INSERT INTO file (idFILE, file_name, file_description, file_upload, file_format) VALUES(?)",
+        [values],
+        function (err, data, fields) {
+            if (err) return next(new AppError(err, 500));
+            res.status(201).json({
+                status: "success",
+                message: "file added!",
+            });
+        }
+    );
 };
 
 exports.getFileById = (req, res, next) => {
-  if (!req.params.id) {
-    return next(new AppError("No file id found", 404));
-  }
-  conn.query(
-    "SELECT * FROM file WHERE idFILE = ?",
-    [req.params.id],
-    function (err, data, fields) {
-      if (err) return next(new AppError(err, 500));
-      res.status(200).json({
-        status: "success",
-        length: data?.length,
-        data: data,
-      });
+    if (!req.params.id) {
+        return next(new AppError("No file id found", 404));
     }
-  );
+    conn.query(
+        "SELECT * FROM file WHERE idFILE = ?",
+        [req.params.id],
+        function (err, data, fields) {
+            if (err) return next(new AppError(err, 500));
+            res.status(200).json({
+                status: "success",
+                length: data?.length,
+                data: data,
+            });
+        }
+    );
 };
 
 exports.updateFile = (req, res, next) => {
-  if (!req.params.id) {
-    return next(new AppError("No file id found", 404));
-  }
-  conn.query(
-    "UPDATE file SET file_name=?, file_description=?, file_upload=?, file_format=? WHERE idFILE=?",
-    [
-      req.body.file_name,
-      req.body.file_description,
-      req.body.file_upload,
-      req.body.file_format,
-      req.params.id,
-      
-      
-    ],
-    function (err, data, fields) {
-      if (err) return next(new AppError(err, 500));
-      res.status(201).json({
-        status: "success",
-        message: "file info updated!",
-      });
+    if (!req.params.id) {
+        return next(new AppError("No file id found", 404));
     }
-  );
+    conn.query(
+        "UPDATE file SET file_name=?, file_description=?, file_upload=?, file_format=? WHERE idFILE=?",
+        [
+            req.body.file_name,
+            req.body.file_description,
+            req.body.file_upload,
+            req.body.file_format,
+            req.params.id,
+        ],
+        function (err, data, fields) {
+            if (err) return next(new AppError(err, 500));
+            res.status(201).json({
+                status: "success",
+                message: "file info updated!",
+            });
+        }
+    );
 };
 
 exports.deleteFile = (req, res, next) => {
-  if (!req.params.id) {
-    return next(new AppError("No todo id found", 404));
-  }
-  conn.query(
-    "DELETE FROM file WHERE idFILE=?",
-    [req.params.id],
-    function (err, fields) {
-      if (err) return next(new AppError(err, 500));
-      res.status(201).json({
-        status: "success",
-        message: "file deleted!",
-      });
+    if (!req.params.id) {
+        return next(new AppError("No todo id found", 404));
     }
-  );
+    conn.query(
+        "DELETE FROM file WHERE idFILE=?",
+        [req.params.id],
+        function (err, fields) {
+            if (err) return next(new AppError(err, 500));
+            res.status(201).json({
+                status: "success",
+                message: "file deleted!",
+            });
+        }
+    );
 };
 ```
 
